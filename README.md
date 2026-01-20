@@ -174,8 +174,6 @@ python3 raytracing_2.py --animate
 ```
 Cette commande créra 36 images .ppm pour créer l'animation.
 
----
-
 ```bash
 python3 raytracing_2.py --animate --frames 10
 ```

@@ -9,8 +9,8 @@ BACKGROUND_COLOR = (0, 0, 0)
 # Canvas and viewport settings
 CANVAS_WIDTH = 500
 CANVAS_HEIGHT = 500
-VIEWPORT_WIDTH = 1.0
-VIEWPORT_HEIGHT = 1.0
+VIEWPORT_WIDTH = 2.0
+VIEWPORT_HEIGHT = 2.0
 VIEWPORT_DISTANCE = 1.0
 
 class Vector:
@@ -283,6 +283,9 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
         N = closest_object.normal
         base_color = closest_object.color
 
+    if N.dot(D) > 0:
+        N = N * -1
+
     # Local illumination
     # lighting = compute_lighting(P, N, V, closest_object.specular, scene, closest_object)
     lighting = compute_lighting(
@@ -319,8 +322,7 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
 
     R_dir = reflect_ray(D, N).normalize()
     # Offset the origin slightly to avoid self-intersection
-    eps = 0.001
-    reflect_origin = P + (N * eps)
+    reflect_origin = P + N * 0.001
     reflected_color = trace_ray(reflect_origin, R_dir, 0.001, INF, scene, depth - 1)
 
     # Combine local and reflected colors
@@ -445,10 +447,10 @@ def create_scene():
     """Create scene with spheres and lights from book_shapes.txt"""
     spheres, lights = parse_input_file('book_shapes.txt')
     planes = [
-        Plane(Vector(0, -2, 0), Vector(0, 1, 0), (200, 200, 200)),  # sol
-        Plane(Vector(0, 0, 10), Vector(0, 0, -1), (180, 190, 200)),    # mur fond
-        Plane(Vector(-5, 0, 0), Vector(1, 0, 0), (0, 200, 0)),     # mur gauche
-        Plane(Vector(5, 0, 0), Vector(-1, 0, 0), (0, 0, 200))      # mur droit
+        Plane(Vector(0, -2, 0), Vector(0, 1, 0), (200, 200, 200)),      # sol
+        Plane(Vector(0, 0, 10), Vector(0, 0, -1), (180, 190, 200)),     # mur fond
+        Plane(Vector(-5, 0, 0), Vector(1, 0, 0), (100, 50, 200)),       # mur gauche
+        Plane(Vector(5, 0, 0), Vector(-1, 0, 0), (200, 0, 0))           # mur droit
     ]
     
     return Scene(spheres, planes, lights)
@@ -507,7 +509,7 @@ def main():
     parser = argparse.ArgumentParser(description="Raytracer Python")
     parser.add_argument("--animate", action="store_true", help="Activer le mode animation")
     parser.add_argument("--frames", type=int, default=36, help="Nombre de frames pour l'animation (défaut: 36)")
-    # Optionnel : permettre de garder ou supprimer les PPM après conversion
+    # Permettre de garder ou supprimer les PPM après conversion
     parser.add_argument("--keep-ppm", action="store_true", help="Garder les fichiers .ppm après la génération du GIF")
     
     args = parser.parse_args()
@@ -572,8 +574,8 @@ def main():
         commandRun = "eog animation.gif"  # Pour Linux avec Eye of GNOME
         print("Opening the GIF with eog...")
         try:
-            subprocess.run(commandRun, shell=True, check=True)
             print("GIF opened successfully.")
+            subprocess.run(commandRun, shell=True, check=True)
         except subprocess.CalledProcessError:
             print("ERROR: Could not open the GIF with eog.")
 
@@ -584,8 +586,11 @@ def main():
         save_ppm(image, filename='output.ppm')
         print("Single frame rendered.")
 
+        print("Opening the image with eog...")
         commandRun = "eog output.ppm"  # Pour Linux avec Eye of GNOME
+        
         try:
+            print("Image opened successfully.")
             subprocess.run(commandRun, shell=True, check=True)
         except subprocess.CalledProcessError:
             print("ERROR: Could not open the image with eog.")
