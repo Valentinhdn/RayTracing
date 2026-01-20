@@ -167,7 +167,7 @@ python3 raytracing_2.py
 
 ---
 
-### Rendu de plusieurs frames
+### Rendu de plusieurs frames
 
 ```bash
 python3 raytracing_2.py --animate
