@@ -1,6 +1,7 @@
 import math
 import re
 import argparse
+import subprocess
 
 # Constants
 INF = float('inf')
@@ -497,13 +498,6 @@ def save_ppm(image, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, filename='output.p
     print(f"Image saved to {filename}")
 
 
-import math
-import re
-import argparse
-import subprocess  # <--- 1. AJOUTER L'IMPORT ICI
-
-# ... [Garder tout le reste du code (Classes, Fonctions) identique] ...
-
 def main():
     # Configuration des arguments de la ligne de commande
     parser = argparse.ArgumentParser(description="Raytracer Python")
@@ -545,7 +539,6 @@ def main():
             
         print("Rendering complete. Generating GIF...")
 
-        # --- 2. EXÉCUTION DE LA COMMANDE CONVERT ---
         # On utilise shell=True pour que le wildcard (*) fonctionne
         command = "convert -delay 10 -loop 0 frame_*.ppm animation.gif"
         
@@ -556,7 +549,7 @@ def main():
             print("SUCCESS: Animation saved as 'animation.gif'")
             print("------------------------------------------------")
             
-            # (Optionnel) Nettoyage des fichiers frame_*.ppm si l'utilisateur ne veut pas les garder
+            # Nettoyage des fichiers frame_*.ppm si l'utilisateur ne veut pas les garder
             if not args.keep_ppm:
                 print("Cleaning up temporary .ppm files...")
                 # Sur Linux/Mac
@@ -597,3 +590,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
