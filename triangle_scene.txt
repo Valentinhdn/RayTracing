@@ -1,0 +1,20 @@
+triangle {
+    v0 = (-1, -1, 4)
+    v1 = (1, -1, 4)
+    v2 = (0, 1, 4)
+    color = (255, 200, 50)
+    specular = 300
+    reflective = 0.4
+}
+
+
+light {
+    type = ambient
+    intensity = 0.2
+}
+
+light {
+    type = point
+    intensity = 0.6
+    position = (2, 3, 0)
+}

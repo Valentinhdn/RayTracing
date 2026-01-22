@@ -3,9 +3,11 @@ import re
 import argparse
 import subprocess
 
+# Constants
 INF = float('inf')
 BACKGROUND_COLOR = (0, 0, 0)
 
+# Canvas and viewport settings
 CANVAS_WIDTH = 500
 CANVAS_HEIGHT = 500
 VIEWPORT_WIDTH = 2.0
@@ -29,6 +31,13 @@ class Vector:
     
     def dot(self, other):
         return self.x * other.x + self.y * other.y + self.z * other.z
+    
+    def cross(self, other):
+        return Vector(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x
+        )
     
     def length(self):
         return math.sqrt(self.dot(self))
@@ -61,6 +70,17 @@ class Plane:
         self.reflective = reflective
         self.texture = texture
 
+class Triangle:
+    def __init__(self, v0, v1, v2, color, specular=100, reflective=0.0, texture=None):
+        self.v0 = v0
+        self.v1 = v1
+        self.v2 = v2
+        self.color = color
+        self.specular = specular
+        self.reflective = reflective
+        self.texture = texture
+        self.normal = (v1 - v0).cross(v2 - v0).normalize()
+
 class Light:
     def __init__(self, light_type, intensity, position=None, direction=None):
         self.type = light_type
@@ -69,10 +89,11 @@ class Light:
         self.direction = direction
 
 class Scene:
-    def __init__(self, spheres, planes, lights):
+    def __init__(self, spheres, planes, lights, triangles=None):
         self.Spheres = spheres
         self.Planes = planes
         self.Lights = lights
+        self.Triangles = triangles if triangles else []
 
 class CheckerTexture:
     def __init__(self, color1, color2, scale=10):
@@ -166,6 +187,36 @@ def intersect_ray_plane(O, D, plane):
     return INF
 
 
+def intersect_ray_triangle(O, D, triangle):
+    EPSILON = 1e-6
+
+    v0, v1, v2 = triangle.v0, triangle.v1, triangle.v2
+    edge1 = v1 - v0
+    edge2 = v2 - v0
+
+    h = D.cross(edge2)
+    a = edge1.dot(h)
+    if -EPSILON < a < EPSILON:
+        return INF
+
+    f = 1.0 / a
+    s = O - v0
+    u = f * s.dot(h)
+    if u < 0.0 or u > 1.0:
+        return INF
+
+    q = s.cross(edge1)
+    v = f * D.dot(q)
+    if v < 0.0 or u + v > 1.0:
+        return INF
+
+    t = f * edge2.dot(q)
+    if t > EPSILON:
+        return t
+
+    return INF
+
+
 def compute_lighting(P, N, V, s, scene, current_sphere=None):
     """
     Compute lighting at point P with normal N and view direction V.
@@ -181,17 +232,23 @@ def compute_lighting(P, N, V, s, scene, current_sphere=None):
     
     for light in scene.Lights:
         if light.type == "ambient":
+            # Ambient light contributes the same to all points
             i += light.intensity
         else:
+            # Direction to light
             if light.type == "point":
                 L = light.position - P
                 t_max = L.length()
-            else: 
+            else:  # directional light
+                # L = light.direction
                 L = light.direction.normalize() * (-1)
                 t_max = INF
 
+            # Shadow check: if any object blocks the light, skip diffuse/specular
             L_dir = L.normalize()
+            
             blocked = False
+
             for sphere in scene.Spheres:
                 if sphere is current_sphere:
                     continue
@@ -199,18 +256,32 @@ def compute_lighting(P, N, V, s, scene, current_sphere=None):
                 if 0.001 < t1 < t_max or 0.001 < t2 < t_max:
                     blocked = True
                     break
+
+            if not blocked:
+                for tri in scene.Triangles:
+                    if tri is current_sphere:
+                        continue
+                    t = intersect_ray_triangle(P, L_dir, tri)
+                    if 0.001 < t < t_max:
+                        blocked = True
+                        break
+
             if blocked:
                 continue
 
+
+            # Diffuse lighting
             n_dot_l = N.dot(L_dir)
             if n_dot_l > 0:
                 i += light.intensity * n_dot_l
             
+            # Attenuation for point lights
             if light.type == "point":
                 distance = L.length()
                 attenuation = 1 / (1 + 0.1 * distance + 0.01 * distance * distance)
                 i += light.intensity * n_dot_l * attenuation
             
+            # Specular lighting
             if s != -1 and s > 0:
                 N_dot_L = N.dot(L_dir)
                 if N_dot_L > 0:
@@ -258,6 +329,13 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
             closest_t = t2
             closest_object = sphere
             object_type = "sphere"
+            
+    for triangle in scene.Triangles:
+        t = intersect_ray_triangle(O, D, triangle)
+        if t_min <= t <= t_max and t < closest_t:
+            closest_t = t
+            closest_object = triangle
+            object_type = "triangle"
 
     if closest_object is None:
         return BACKGROUND_COLOR
@@ -267,6 +345,9 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
 
     if object_type == "sphere":
         N = (P - closest_object.center).normalize()
+        base_color = closest_object.color
+    elif object_type == "plane":
+        N = closest_object.normal
         base_color = closest_object.color
     else:
         N = closest_object.normal
@@ -400,6 +481,75 @@ def parse_input_file(input_file):
     return spheres, lights
 
 
+def parse_triangle_file(input_file):
+    triangles = []
+    lights = []
+
+    with open(input_file, 'r') as f:
+        content = f.read()
+
+    tri_blocks = re.findall(r'triangle\s*\{([^}]+)\}', content, re.DOTALL)
+    for block in tri_blocks:
+        data = {}
+        def vec(name):
+            m = re.search(rf'{name}\s*=\s*\(([^)]+)\)', block)
+            if not m:
+                return None
+            vals = [float(x.strip()) for x in m.group(1).split(',')]
+            return Vector(vals[0], vals[1], vals[2])
+
+        data["v0"] = vec("v0")
+        data["v1"] = vec("v1")
+        data["v2"] = vec("v2")
+
+        color_match = re.search(r'color\s*=\s*\(([^)]+)\)', block)
+        spec_match = re.search(r'specular\s*=\s*([\d.]+)', block)
+        refl_match = re.search(r'reflective\s*=\s*([\d.]+)', block)
+
+        if color_match:
+            data["color"] = tuple(int(float(x.strip())) for x in color_match.group(1).split(','))
+
+        if all(k in data for k in ["v0", "v1", "v2", "color"]):
+            triangles.append(Triangle(
+                data["v0"],
+                data["v1"],
+                data["v2"],
+                data["color"],
+                float(spec_match.group(1)) if spec_match else 100,
+                float(refl_match.group(1)) if refl_match else 0.0,
+                None
+            ))
+
+    light_blocks = re.findall(r'light\s*\{([^}]+)\}', content, re.DOTALL)
+    for block in light_blocks:
+        light_data = {}
+        type_match = re.search(r'type\s*=\s*(\w+)', block)
+        intensity_match = re.search(r'intensity\s*=\s*([\d.]+)', block)
+        position_match = re.search(r'position\s*=\s*\(([^)]+)\)', block)
+        direction_match = re.search(r'direction\s*=\s*\(([^)]+)\)', block)
+
+        if type_match:
+            light_data['type'] = type_match.group(1)
+        if intensity_match:
+            light_data['intensity'] = float(intensity_match.group(1))
+        if position_match:
+            vals = [float(x.strip()) for x in position_match.group(1).split(',')]
+            light_data['position'] = Vector(*vals)
+        if direction_match:
+            vals = [float(x.strip()) for x in direction_match.group(1).split(',')]
+            light_data['direction'] = Vector(*vals)
+
+        if 'type' in light_data and 'intensity' in light_data:
+            lights.append(Light(
+                light_data['type'],
+                light_data['intensity'],
+                light_data.get('position'),
+                light_data.get('direction')
+            ))
+
+    return triangles, lights
+
+
 def sphere_uv(P, sphere):
     p = (P - sphere.center).normalize()
 
@@ -423,6 +573,21 @@ def create_scene():
     return Scene(spheres, planes, lights)
 
 
+def create_triangle_scene():
+    triangles, lights = parse_triangle_file("triangle_scene.txt")
+    spheres = []
+    planes = [
+        Plane(Vector(0, -2, 0), Vector(0, 1, 0), (200, 200, 200)),      # sol
+        Plane(Vector(0, 0, 10), Vector(0, 0, -1), (180, 190, 200)),    # mur fond
+        Plane(Vector(-5, 0, 0), Vector(1, 0, 0), (100, 50, 200)),      # mur gauche
+        Plane(Vector(5, 0, 0), Vector(-1, 0, 0), (200, 0, 0)),         # mur droit
+        Plane(Vector(0, 5, 0), Vector(0, -1, 0), (200, 200, 200))     # plafond
+    ]
+
+    return Scene(spheres, planes, lights, triangles=triangles)
+
+
+
 def orbit_light(center, radius, angle_deg, height=2):
     angle = math.radians(angle_deg)
     return Vector(
@@ -440,9 +605,7 @@ def render_image(scene, width=CANVAS_WIDTH, height=CANVAS_HEIGHT):
         row = []
         for x in range(-width // 2, width // 2):
             D = canvas_to_viewport(x, y).normalize()
-            
             O = Vector(0, 0, 0)
-            
             color = trace_ray(O, D, 1.0, INF, scene, depth=3)
             row.append(color)
         image.append(row)
@@ -465,12 +628,19 @@ def main():
     parser = argparse.ArgumentParser(description="Raytracer Python")
     parser.add_argument("--animate", action="store_true", help="Activer le mode animation")
     parser.add_argument("--frames", type=int, default=36, help="Nombre de frames pour l'animation (défaut: 36)")
+    parser.add_argument("--scene", choices=["default", "triangle"], default="default", help="Choisir la scène à afficher")
     
     args = parser.parse_args()
 
     print("Creating scene...")
-    scene = create_scene()
-    print(f"Scene created with {len(scene.Spheres)} spheres and {len(scene.Lights)} lights")
+    if args.scene == "triangle":
+        scene = create_triangle_scene()
+        print(f"Triangle scene created with {len(scene.Triangles)} triangle(s)")
+    else:
+        scene = create_scene()
+        print(f"Scene created with {len(scene.Spheres)} spheres and {len(scene.Lights)} lights")
+
+
 
     if args.animate:
         nb_frames = args.frames
@@ -482,13 +652,24 @@ def main():
         for i in range(nb_frames):
             angle = (360 / nb_frames) * i
 
-            if len(scene.Spheres) > 0 and len(scene.Lights) > 1:
+            if len(scene.Lights) > 1:
+                if len(scene.Spheres) > 0:
+                    center = scene.Spheres[0].center
+                elif len(scene.Triangles) > 0:
+                    cx = sum(t.v0.x + t.v1.x + t.v2.x for t in scene.Triangles) / (3 * len(scene.Triangles))
+                    cy = sum(t.v0.y + t.v1.y + t.v2.y for t in scene.Triangles) / (3 * len(scene.Triangles))
+                    cz = sum(t.v0.z + t.v1.z + t.v2.z for t in scene.Triangles) / (3 * len(scene.Triangles))
+                    center = Vector(cx, cy, cz)
+                else:
+                    center = Vector(0, 0, 5)
+
                 scene.Lights[1].position = orbit_light(
-                    scene.Spheres[0].center,
+                    center,
                     radius=radius,
                     angle_deg=angle,
                     height=height
                 )
+
 
             print(f"Rendering frame {i+1}/{nb_frames} (angle={angle:.1f})")
             image = render_image(scene)
@@ -516,7 +697,7 @@ def main():
             print("ERROR: Command not found. Is ImageMagick installed?")
 
         
-        commandRun = "eog animation.gif"
+        commandRun = "eog animation.gif" 
         print("Opening the GIF with eog...")
         try:
             print("GIF opened successfully.")
@@ -531,7 +712,7 @@ def main():
         print("Single frame rendered.")
 
         print("Opening the image with eog...")
-        commandRun = "eog output.ppm"
+        commandRun = "eog output.ppm" 
         
         try:
             print("Image opened successfully.")

@@ -3,9 +3,12 @@ import re
 import argparse
 import subprocess
 
+
+# Constants
 INF = float('inf')
 BACKGROUND_COLOR = (0, 0, 0)
 
+# Canvas and viewport settings
 CANVAS_WIDTH = 500
 CANVAS_HEIGHT = 500
 VIEWPORT_WIDTH = 2.0
@@ -181,15 +184,19 @@ def compute_lighting(P, N, V, s, scene, current_sphere=None):
     
     for light in scene.Lights:
         if light.type == "ambient":
+            # Ambient light contributes the same to all points
             i += light.intensity
         else:
+            # Direction to light
             if light.type == "point":
                 L = light.position - P
                 t_max = L.length()
-            else: 
+            else:  # directional light
+                # L = light.direction
                 L = light.direction.normalize() * (-1)
                 t_max = INF
 
+            # Shadow check: if any object blocks the light, skip diffuse/specular
             L_dir = L.normalize()
             blocked = False
             for sphere in scene.Spheres:
@@ -202,15 +209,18 @@ def compute_lighting(P, N, V, s, scene, current_sphere=None):
             if blocked:
                 continue
 
+            # Diffuse lighting
             n_dot_l = N.dot(L_dir)
             if n_dot_l > 0:
                 i += light.intensity * n_dot_l
             
+            # Attenuation for point lights
             if light.type == "point":
                 distance = L.length()
                 attenuation = 1 / (1 + 0.1 * distance + 0.01 * distance * distance)
                 i += light.intensity * n_dot_l * attenuation
             
+            # Specular lighting
             if s != -1 and s > 0:
                 N_dot_L = N.dot(L_dir)
                 if N_dot_L > 0:
@@ -261,7 +271,10 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
 
     if closest_object is None:
         return BACKGROUND_COLOR
+    # end trace_ray
+    # return closest_sphere.color
 
+    # Intersection point and normal
     P = O + (D * closest_t)
     V = D * (-1)
 
@@ -275,6 +288,8 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
     if N.dot(D) > 0:
         N = N * -1
 
+    # Local illumination
+    # lighting = compute_lighting(P, N, V, closest_object.specular, scene, closest_object)
     lighting = compute_lighting(
         P, N, V,
         closest_object.specular,
@@ -282,6 +297,11 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
         closest_object
     )
     lighting = max(0, min(1, lighting))
+    # if closest_object.texture:
+    #     u, v = sphere_uv(P, closest_object)
+    #     base_color = closest_object.texture.get_color(u, v)
+    # else:
+    #     base_color = closest_object.color
 
     if closest_object.texture:
         u, v = sphere_uv(P, closest_object) if object_type == "sphere" else (0, 0)
@@ -295,15 +315,19 @@ def trace_ray(O, D, t_min, t_max, scene, depth=3):
         int(base_color[2] * lighting),
     )
 
+    # Reflections
+    # reflective = getattr(closest_object, "reflective", 0.0)
     reflective = closest_object.reflective
 
     if depth <= 0 or reflective <= 0:
         return local_color
 
     R_dir = reflect_ray(D, N).normalize()
+    # Offset the origin slightly to avoid self-intersection
     reflect_origin = P + N * 0.001
     reflected_color = trace_ray(reflect_origin, R_dir, 0.001, INF, scene, depth - 1)
 
+    # Combine local and reflected colors
     r = int(local_color[0] * (1 - reflective) + reflected_color[0] * reflective)
     g = int(local_color[1] * (1 - reflective) + reflected_color[1] * reflective)
     b = int(local_color[2] * (1 - reflective) + reflected_color[2] * reflective)
@@ -318,29 +342,35 @@ def parse_input_file(input_file):
     with open(input_file, 'r') as f:
         content = f.read()
     
+    # Find all sphere blocks
     sphere_blocks = re.findall(r'sphere\s*\{([^}]+)\}', content, re.DOTALL)
     
     for block in sphere_blocks:
         sphere_data = {}
         
+        # Parse center
         center_match = re.search(r'center\s*=\s*\(([^)]+)\)', block)
         if center_match:
             values = [float(x.strip()) for x in center_match.group(1).split(',')]
             sphere_data['center'] = Vector(values[0], values[1], values[2])
         
+        # Parse radius
         radius_match = re.search(r'radius\s*=\s*([\d.]+)', block)
         if radius_match:
             sphere_data['radius'] = float(radius_match.group(1))
         
+        # Parse color
         color_match = re.search(r'color\s*=\s*\(([^)]+)\)', block)
         if color_match:
             values = [int(float(x.strip())) for x in color_match.group(1).split(',')]
             sphere_data['color'] = tuple(values)
         
+        # Parse specular
         specular_match = re.search(r'specular\s*=\s*([\d.]+)', block)
         if specular_match:
             sphere_data['specular'] = float(specular_match.group(1))
 
+        # Parse reflective (optional)
         reflective_match = re.search(r'reflective\s*=\s*([\d.]+)', block)
         if reflective_match:
             sphere_data['reflective'] = float(reflective_match.group(1))
@@ -365,24 +395,29 @@ def parse_input_file(input_file):
             )
             spheres.append(sphere)
     
+    # Find all light blocks
     light_blocks = re.findall(r'light\s*\{([^}]+)\}', content, re.DOTALL)
     
     for block in light_blocks:
         light_data = {}
         
+        # Parse light type
         type_match = re.search(r'type\s*=\s*(\w+)', block)
         if type_match:
             light_data['type'] = type_match.group(1)
         
+        # Parse intensity
         intensity_match = re.search(r'intensity\s*=\s*([\d.]+)', block)
         if intensity_match:
             light_data['intensity'] = float(intensity_match.group(1))
         
+        # Parse position (for point lights)
         position_match = re.search(r'position\s*=\s*\(([^)]+)\)', block)
         if position_match:
             values = [float(x.strip()) for x in position_match.group(1).split(',')]
             light_data['position'] = Vector(values[0], values[1], values[2])
         
+        # Parse direction (for directional lights)
         direction_match = re.search(r'direction\s*=\s*\(([^)]+)\)', block)
         if direction_match:
             values = [float(x.strip()) for x in direction_match.group(1).split(',')]
@@ -401,6 +436,7 @@ def parse_input_file(input_file):
 
 
 def sphere_uv(P, sphere):
+    # vecteur normalisé depuis le centre
     p = (P - sphere.center).normalize()
 
     u = 0.5 + math.atan2(p.z, p.x) / (2 * math.pi)
@@ -411,7 +447,7 @@ def sphere_uv(P, sphere):
 
 def create_scene():
     """Create scene with spheres and lights from book_shapes.txt"""
-    spheres, lights = parse_input_file('book_shapes.txt')
+    spheres, lights = parse_input_file('shapes_move.txt')
     planes = [
         Plane(Vector(0, -2, 0), Vector(0, 1, 0), (200, 200, 200)),      # sol
         Plane(Vector(0, 0, 10), Vector(0, 0, -1), (180, 190, 200)),     # mur fond
@@ -423,13 +459,24 @@ def create_scene():
     return Scene(spheres, planes, lights)
 
 
-def orbit_light(center, radius, angle_deg, height=2):
-    angle = math.radians(angle_deg)
-    return Vector(
-        center.x + radius * math.cos(angle),
-        height,
-        center.z + radius * math.sin(angle)
-    )
+def animate_spheres(scene, initial_centers, frame, total_frames):
+    angle_base = 360 * frame / total_frames
+
+    for i, sphere in enumerate(scene.Spheres):
+        base = initial_centers[i]
+
+        # Paramètres par sphère
+        radius = 1.5 + 0.5 * i      # rayon différent
+        speed = 1.0 + 0.3 * i       # vitesse différente
+        phase = angle_base * speed + i * 45
+
+        angle = math.radians(phase)
+
+        sphere.center = Vector(
+            base.x + radius * math.cos(angle),
+            base.y + math.sin(angle) * 0.8,   # flottement vertical
+            base.z + radius * math.sin(angle) 
+        )
 
 
 def render_image(scene, width=CANVAS_WIDTH, height=CANVAS_HEIGHT):
@@ -439,10 +486,13 @@ def render_image(scene, width=CANVAS_WIDTH, height=CANVAS_HEIGHT):
     for y in range(height // 2, -height // 2, -1):
         row = []
         for x in range(-width // 2, width // 2):
+            # Convert canvas coordinates to viewport
             D = canvas_to_viewport(x, y).normalize()
             
+            # Ray origin at camera
             O = Vector(0, 0, 0)
             
+            # Trace ray
             color = trace_ray(O, D, 1.0, INF, scene, depth=3)
             row.append(color)
         image.append(row)
@@ -465,14 +515,19 @@ def main():
     parser = argparse.ArgumentParser(description="Raytracer Python")
     parser.add_argument("--animate", action="store_true", help="Activer le mode animation")
     parser.add_argument("--frames", type=int, default=36, help="Nombre de frames pour l'animation (défaut: 36)")
+    # parser.add_argument("--input", type=str, default="book_shapes.txt", help="Fichier d'entrée pour la scène")
     
     args = parser.parse_args()
 
     print("Creating scene...")
     scene = create_scene()
+
+    initial_centers = [Vector(s.center.x, s.center.y, s.center.z) for s in scene.Spheres]
+
     print(f"Scene created with {len(scene.Spheres)} spheres and {len(scene.Lights)} lights")
 
     if args.animate:
+        # --- MODE ANIMATION ---
         nb_frames = args.frames
         radius = 5
         height = 3
@@ -482,13 +537,7 @@ def main():
         for i in range(nb_frames):
             angle = (360 / nb_frames) * i
 
-            if len(scene.Spheres) > 0 and len(scene.Lights) > 1:
-                scene.Lights[1].position = orbit_light(
-                    scene.Spheres[0].center,
-                    radius=radius,
-                    angle_deg=angle,
-                    height=height
-                )
+            animate_spheres(scene, initial_centers, i, nb_frames)
 
             print(f"Rendering frame {i+1}/{nb_frames} (angle={angle:.1f})")
             image = render_image(scene)
@@ -505,8 +554,12 @@ def main():
             print("------------------------------------------------")
             print("SUCCESS: Animation saved as 'animation.gif'")
             print("------------------------------------------------")
+            
             print("Cleaning up temporary .ppm files...")
+            # Sur Linux
             subprocess.run("rm frame_*.ppm", shell=True)
+            # Sur Windows
+            # subprocess.run("del frame_*.ppm", shell=True)
             print("Cleanup frame_*.ppm complete.")
                 
         except subprocess.CalledProcessError:
@@ -541,4 +594,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

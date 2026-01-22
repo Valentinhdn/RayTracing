@@ -1,0 +1,43 @@
+sphere {
+    center = (0, -1, 3)
+    radius = 1
+    color = (255, 0, 0)  # Red
+    specular = 500  # Shiny
+    reflective = 0.3  # Reflective
+    texture = checker
+}
+sphere {
+    center = (2, 0, 4)
+    radius = 1
+    color = (0, 0, 255)  # Blue
+    specular = 500  # Shiny
+    reflective = 0.3  # Reflective
+}
+sphere {
+    center = (-2, 0, 4)
+    radius = 1
+    color = (0, 255, 0)  # Green
+    specular = 10  # Somewhat shiny
+    reflective = 0.5  # More reflective
+}
+
+
+# Ambient light
+light {
+    type = ambient
+    intensity = 0.2
+}
+
+# Point light
+light {
+    type = point
+    intensity = 0.6
+    position = (2, 1, 0)
+}
+
+# Directional light
+light {
+    type = directional
+    intensity = 0.2
+    direction = (1, 4, 4)
+}
