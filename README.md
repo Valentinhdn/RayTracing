@@ -145,7 +145,7 @@ render_image(scene)
 save_ppm(image, filename)
 ```
 
-Le format utilisé est **PPM**, simple et lisible.
+Le format utilisé est **PPM**.
 
 ---
 
@@ -157,28 +157,43 @@ Le format utilisé est **PPM**, simple et lisible.
 sudo apt install imagemagick
 ```
 
----
-
 ### Rendu d'une seule image
 
 ```bash
-python3 raytracing_2.py
+python3 raytracing_FINAL.py
 ```
-
----
 
 ### Rendu de plusieurs frames
 
 ```bash
-python3 raytracing_2.py --animate
+python3 raytracing_FINAL.py --animate
 ```
-Cette commande créra 36 images .ppm pour créer l'animation.
+Cette commande créra 36 images .ppm pour créer l'animation GIF.
 
 ```bash
-python3 raytracing_2.py --animate --frames 10
+python3 raytracing_FINAL.py --animate --frames 10
 ```
-Cette commande créra 10 images ppm pour créer l'animation. 
+Cette commande créra 10 images ppm pour créer l'animation GIF. 
 Le nombre de frame peut être ajuster en changeant ce nombre.
+
+### Choix de la scène
+
+```bash
+python3 raytracing_FINAL.py --scene triangle
+```
+Cette commande permet de selectionné la scène à afficher (ici, scèce triangle).
+
+---
+
+## Paramètre
+``` 
+--animate : Pour créer un GIF
+--frames X : Pour choisir le nombre d'image dans le GIF (par défaut : 36)
+--scene ___ : Pour choisir la scène triangle, sphere ou move (par défaut : sphere)
+            triangle    -->     fichier triangle_scene.txt
+            sphere      -->     fichier book_shapes.txt
+            move        -->     fichier shapes_move.txt
+```
 
 ---
 
