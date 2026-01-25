@@ -1,4 +1,4 @@
-# Ray Tracing Python – Projet pédagogique
+# Ray Tracing Python – Projet Outils mathématiques pour la modélisation
 
 ## 📌 Description générale
 
@@ -16,24 +16,37 @@ Le moteur permet de :
 
 ---
 
+## ⚠️ Compatibilité système
+
+Le code à été conçu à l'origine pour fonctionner sur **Linux**. 
+Nous avons donc ajouter un contrôle du système d'exploitation pour exécuter les commandes appropriées en fonction du système *Linux* ou *Windows*. 
+
+Si vous êtes sur **Windows**, il faut que le chemin d'accès soit : 
+```text
+C:\Program Files\ImageMagick-7.1.2-Q16-HDRI\magick.exe
+```
+Si ce n'est pas le cas, alors il faut changer le chemin d'accès dans la fonction `main()` du fichier `raytracing_FINAL.py`. 
+
+---
+
 ## 📁 Structure du projet
 
 ```
 RayTracing/
-│── raytracing_helped.py     # Code principal
-│── book_shapes.txt          # Description de la scène (sphères + lumières)
-│── frame_00.ppm             # Images générées
-│── frame_01.ppm
-│── ...
-│── animation.gif            # GIF final
-│── README.md                # Documentation
+│── raytracing_FINAL.py     # Code principal
+│── book_shapes.txt         # Scène : 4 sphères + 3 lumières
+|── shapes_move.txt         # Scène : 3 sphères + 3 lumières
+|── triangle_scene.txt      # Scène : 1 triangle + 2 lumières
+│── output.ppm              # Image unique
+│── animation.gif           # GIF final
+│── README.md               # Documentation
 ```
 
 ---
 
-## Description de la scène (`book_shapes.txt`)
+## Description des scènes (`book_shapes.txt`, `shapes_move.txt`, `triangle_scene.txt`)
 
-La scène est décrite dans un fichier texte simple.
+Les scènes sont décrites dans des fichier texte.
 
 ### Exemple de sphère
 ```txt
@@ -47,6 +60,18 @@ sphere {
 }
 ```
 
+### Exemple de triangle 
+```txt
+triangle {
+    v0 = (-1, -1, 4)
+    v1 = (1, -1, 4)
+    v2 = (0, 1, 4)
+    color = (255, 200, 50)
+    specular = 300
+    reflective = 0.4
+}
+```
+
 ### Paramètres disponibles
 | Paramètre | Description |
 |---------|-------------|
@@ -56,6 +81,7 @@ sphere {
 | specular | Brillance spéculaire |
 | reflective | Coefficient de réflexion |
 | texture | Texture procédurale (checker) |
+| v0, V1, V2 | Sommets du triangle |
 
 ---
 
@@ -96,12 +122,13 @@ light {
 
 ### Objets de la scène
 - `Sphere`
+- `Triangle`
 - `Plane`
 - `Light`
 - `Scene`
 
 ### Textures
-- `CheckerTexture` : texture procédurale damier
+- `CheckerTexture` : texture damier
 - Mapping UV sphérique via la fonction `sphere_uv()`
 
 ---
@@ -117,6 +144,8 @@ Le modèle utilisé est **Phong**, incluant :
 Fonction principale :
 ```python
 compute_lighting(P, N, V, specular, scene, current_object)
+trace_ray(O, D, t_min, t_max, scene, depth=3)
+
 ```
 
 ---
@@ -153,8 +182,13 @@ Le format utilisé est **PPM**.
 
 ### Installation d’ImageMagick
 
+Sur **Linux** :
 ```bash
 sudo apt install imagemagick
+```
+Sur **Windows** :
+```bash
+winget install ImageMagick.ImageMagick
 ```
 
 ### Rendu d'une seule image
@@ -183,16 +217,50 @@ python3 raytracing_FINAL.py --scene triangle
 ```
 Cette commande permet de selectionné la scène à afficher (ici, scèce triangle).
 
+| Valeur   | Fichier utilisé    |
+| -------- | ------------------ |
+| triangle | triangle_scene.txt |
+| sphere   | book_shapes.txt    |
+| move     | shapes_move.txt    |
+
 ---
 
-## Paramètre
-``` 
---animate : Pour créer un GIF
---frames X : Pour choisir le nombre d'image dans le GIF (par défaut : 36)
---scene ___ : Pour choisir la scène triangle, sphere ou move (par défaut : sphere)
-            triangle    -->     fichier triangle_scene.txt
-            sphere      -->     fichier book_shapes.txt
-            move        -->     fichier shapes_move.txt
+## Paramètres disponibles
+
+| Paramètre     | Description   |
+| ------------- | ------------- |
+| --animate     | Pour géner un GIF et non un ppm |
+| --frames X    | Nombres d'images pour le GIF (défaut : 36) |
+| --scene [nom] | Choisir la scène (triangle, sphere, move) |
+
+---
+
+## Commandes système
+
+La fonction `main()` utilise des commandes pour automatiser la génération et l'ouverture des images. 
+
+Les commandes ont été conçues pour fonctionner sur **Linux** : 
+```python
+command = "convert -delay 10 -loop 0 frame_*.ppm animation.gif"
+```
+```python
+commandRun = "eog animation.gif"
+commandRun = "eog output.ppm"
+```
+```python
+subprocess.run("rm frame_*.ppm", shell=True)
+```
+
+Sur **Windows**, ces commandes ont été remplacées par : 
+```python
+command = "magick -delay 10 -loop 0 frame_*.ppm animation.gif"
+```
+```python
+commandRun = "start animation.gif"
+commandRun = "start output.ppm"
+```
+```python
+subprocess.run("del frame_*.ppm", shell=True)
 ```
 
 ---
@@ -207,10 +275,11 @@ Ce projet démontre :
 
 Il constitue une base solide pour des extensions telles que :
 - Textures image (PNG/JPG)
-- Soft shadows
+- Ombre douce (Soft shadows)
 - Bump mapping
 - Caméra mobile
+- Mouvement et accélération
 
 ---
 
-✍️ *Projet académique – Ray Tracing en Python*
+✍️ ***Valentin HODONOU & Clément PACAULT***

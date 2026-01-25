@@ -2,6 +2,7 @@ import math
 import re
 import argparse
 import subprocess
+import sys
 
 INF = float('inf')
 BACKGROUND_COLOR = (0, 0, 0)
@@ -661,7 +662,7 @@ def main():
                     radius=radius,
                     angle_deg=angle,
                     height=height
-                )  
+                ) 
 
             print(f"Rendering frame {i+1}/{nb_frames} (angle={angle:.1f})")
             image = render_image(scene)
@@ -671,15 +672,22 @@ def main():
             
         print("Rendering complete. Generating GIF...")
 
-        command = "convert -delay 10 -loop 0 frame_*.ppm animation.gif"
-        
+        if sys.platform.startswith('linux'):
+            command = "convert -delay 10 -loop 0 frame_*.ppm animation.gif"
+        else:
+            magick_path = r"C:\Program Files\ImageMagick-7.1.2-Q16-HDRI\magick.exe"
+            command = f'"{magick_path}" -delay 10 -loop 0 "frame_*.ppm" animation.gif'
+
         try:
             subprocess.run(command, shell=True, check=True)
             print("------------------------------------------------")
             print("SUCCESS: Animation saved as 'animation.gif'")
             print("------------------------------------------------")
             print("Cleaning up temporary .ppm files...")
-            subprocess.run("rm frame_*.ppm", shell=True)
+            if sys.platform.startswith('linux'):
+                subprocess.run("rm frame_*.ppm", shell=True)
+            else:
+                subprocess.run("del frame_*.ppm", shell=True)
             print("Cleanup frame_*.ppm complete.")
                 
         except subprocess.CalledProcessError:
@@ -689,7 +697,10 @@ def main():
             print("ERROR: Command not found. Is ImageMagick installed?")
 
         
-        commandRun = "eog animation.gif"
+        if sys.platform.startswith('linux'):
+            commandRun = "eog animation.gif"
+        else:
+            commandRun = "start animation.gif"
         print("Opening the GIF with eog...")
         try:
             print("GIF opened successfully.")
@@ -704,7 +715,11 @@ def main():
         print("Single frame rendered.")
 
         print("Opening the image with eog...")
-        commandRun = "eog output.ppm"
+
+        if sys.platform.startswith('linux'):
+            commandRun = "eog output.ppm"
+        else:
+            commandRun = "start output.ppm"
         
         try:
             print("Image opened successfully.")
